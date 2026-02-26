@@ -1,3 +1,7 @@
+# Web Framework & Server
+flask>=3.0.0
+gunicorn>=21.0.0
+
 # CLI Interface
 click>=8.1.0
 
