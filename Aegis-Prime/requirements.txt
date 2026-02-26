@@ -1,0 +1,33 @@
+# Zero-Knowledge Proofs (ZK-SNARKs)
+pyzokrates==0.2.0
+
+# WebAssembly Execution & Sandboxing
+wasmtime==14.0.4
+
+# Post-Quantum Cryptography (Kyber-512)
+liboqs-python==0.8.0
+
+# Substrate Blockchain Integration
+pysubstrate-interface==1.5.1
+
+# Type Hints & Runtime Validation
+typing-extensions>=4.9.0
+pydantic>=2.5.0
+
+# Async/Concurrency Support
+anyio>=4.1.0
+
+# Cryptographic Utilities
+cryptography>=42.0.0
+
+# Serialization (CBOR for blockchain/state)
+cbor2>=5.4.6
+
+# Logging & Observability
+structlog>=24.1.0
+
+# Testing & Development
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+black>=24.1.0
+mypy>=1.8.0
