@@ -509,5 +509,9 @@ __all__ = [
     "Transaction",
     "Block",
     "ChainState",
+    # Zenith Mesh Data Classes (exported from zenith_mesh.py)
+    "SealedIntent",
+    "DeferredAction",
+    "SyncStatus",
 ]
 

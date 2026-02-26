@@ -10,6 +10,9 @@ liboqs-python==0.8.0
 # Substrate Blockchain Integration
 pysubstrate-interface==1.5.1
 
+# Keccak-256 Hashing (for Intent Sealing)
+eth-keys>=0.5.0
+
 # Type Hints & Runtime Validation
 typing-extensions>=4.9.0
 pydantic>=2.5.0
