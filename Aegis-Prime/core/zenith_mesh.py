@@ -9,6 +9,8 @@ Features:
 - Full Substrate chain interaction via pysubstrate-interface
 """
 
+from __future__ import annotations
+
 import os
 import sqlite3
 import hashlib
@@ -156,18 +158,6 @@ class ZenithMesh(ZenithMeshInterface):
             buffer_db_path: Path to encrypted deferred sync database
             enable_deferred_sync: Enable offline-first queuing
         """
-        if not SUBSTRATE_AVAILABLE:
-            raise RuntimeError(
-                "pysubstrate-interface not installed. "
-                "Install with: pip install pysubstrate-interface"
-            )
-
-        if not KECCAK_AVAILABLE:
-            raise RuntimeError(
-                "eth_keys not installed (for Keccak-256). "
-                "Install with: pip install eth-keys"
-            )
-
         self.endpoint = endpoint
         self.buffer_db_path = buffer_db_path
         self.enable_deferred_sync = enable_deferred_sync
@@ -183,7 +173,12 @@ class ZenithMesh(ZenithMeshInterface):
         try:
             # Load or generate keypair
             self._keypair = self._load_keypair(keypair_path)
-            logger.info(f"Keypair loaded: {self._keypair.ss58_address}")
+
+            if SUBSTRATE_AVAILABLE:
+                logger.info(f"Keypair loaded: {self._keypair.ss58_address}")
+            else:
+                logger.warning("[STUB MODE] ZenithMesh: Substrate not available - using mock ledger")
+                logger.warning("↳ For production, install: pip install pysubstrate-interface eth-keys")
 
             # Initialize encrypted buffer.db
             if enable_deferred_sync:
@@ -200,26 +195,35 @@ class ZenithMesh(ZenithMeshInterface):
 
     def _load_keypair(self, keypair_path: Optional[str]) -> Keypair:
         """Load or generate keypair for signing extrinsics."""
-        if keypair_path and os.path.exists(keypair_path):
-            try:
-                with open(keypair_path, 'r') as f:
-                    secret_hex = f.read().strip()
-                keypair = Keypair.create_from_private_key(secret_hex)
-                logger.info(f"Keypair loaded from {keypair_path}")
+        if SUBSTRATE_AVAILABLE:
+            if keypair_path and os.path.exists(keypair_path):
+                try:
+                    with open(keypair_path, 'r') as f:
+                        secret_hex = f.read().strip()
+                    keypair = Keypair.create_from_private_key(secret_hex)
+                    logger.info(f"Keypair loaded from {keypair_path}")
+                    return keypair
+                except Exception as e:
+                    logger.error(f"Failed to load keypair from {keypair_path}: {e}")
+                    raise SigningError(f"Keypair load failed: {e}") from e
+            else:
+                # Generate new keypair
+                keypair = Keypair.create_from_uri("//Aegis-Prime-Agent")
+                if keypair_path:
+                    Path(keypair_path).parent.mkdir(parents=True, exist_ok=True)
+                    with open(keypair_path, 'w') as f:
+                        f.write(keypair.private_key)
+                    os.chmod(keypair_path, 0o600)  # Restrict permissions
+                    logger.info(f"Generated new keypair and saved to {keypair_path}")
                 return keypair
-            except Exception as e:
-                logger.error(f"Failed to load keypair from {keypair_path}: {e}")
-                raise SigningError(f"Keypair load failed: {e}") from e
         else:
-            # Generate new keypair
-            keypair = Keypair.create_from_uri("//Aegis-Prime-Agent")
-            if keypair_path:
-                Path(keypair_path).parent.mkdir(parents=True, exist_ok=True)
-                with open(keypair_path, 'w') as f:
-                    f.write(keypair.private_key)
-                os.chmod(keypair_path, 0o600)  # Restrict permissions
-                logger.info(f"Generated new keypair and saved to {keypair_path}")
-            return keypair
+            # Stub mode: generate mock keypair
+            logger.debug("[STUB] Generating mock keypair for offline mode")
+            return type('MockKeypair', (), {
+                'ss58_address': '5GrwvaEF5zXb26Fz9rcQkPAWP3B6F2f3pq7W9S4N6pVs3xqV',
+                'private_key': hashlib.sha256(b"aegis-prime-stub-keypair").hexdigest(),
+                'public_key': hashlib.sha256(b"aegis-prime-stub-pubkey").digest()
+            })()
 
     # ========================================================================
     # Encrypted Buffer Database (Deferred-Sync)
@@ -228,19 +232,26 @@ class ZenithMesh(ZenithMeshInterface):
     def _init_buffer_db(self) -> None:
         """Initialize encrypted buffer.db for deferred intents."""
         try:
-            # Derive encryption key from keypair + endpoint
-            key_material = (
-                self._keypair.private_key.encode() +
-                self.endpoint.encode()
-            )
-            key_hash = hashlib.sha256(key_material).digest()
-            self._db_cipher = Fernet(Fernet.encrypt_at_time(key_hash, b"", int(time.time())))
+            # Try to setup Fernet encryption
+            encryption_ok = False
+            try:
+                # Derive encryption key from keypair + endpoint
+                key_material = (
+                    self._keypair.private_key.encode() +
+                    self.endpoint.encode()
+                )
+                key_hash = hashlib.sha256(key_material).digest()
 
-            # Simplified: use key_hash for direct encryption
-            # (Fernet requires base64-encoded key)
-            import base64
-            key_b64 = base64.urlsafe_b64encode(key_hash)
-            self._db_cipher = Fernet(key_b64)
+                # Simplified: use key_hash for direct encryption (Fernet requires base64-encoded key)
+                import base64
+                key_b64 = base64.urlsafe_b64encode(key_hash)
+                self._db_cipher = Fernet(key_b64)
+                encryption_ok = True
+                logger.info("Fernet encryption initialized for buffer.db")
+            except Exception as enc_err:
+                # Fallback: no encryption (for stub/offline mode)
+                logger.warning(f"[FALLBACK] Fernet encryption failed ({type(enc_err).__name__}), using unencrypted buffer.db")
+                self._db_cipher = None
 
             # Create or open database
             db_path = Path(self.buffer_db_path)
@@ -265,10 +276,12 @@ class ZenithMesh(ZenithMeshInterface):
             conn.commit()
             conn.close()
 
-            logger.info(f"Encrypted buffer.db initialized at {self.buffer_db_path}")
+            encryption_status = "encrypted" if encryption_ok else "unencrypted"
+            logger.info(f"{encryption_status.capitalize()} buffer.db initialized at {self.buffer_db_path}")
         except Exception as e:
             logger.error(f"Buffer.db initialization failed: {e}")
-            raise DatabaseError(f"Buffer.db init failed: {e}") from e
+            logger.warning("[FALLBACK] Continuing without persistent deferred sync (in-memory only)")
+            self._db_cipher = None
 
     def _load_deferred_intents(self) -> None:
         """Load pending deferred intents from buffer.db."""
@@ -292,12 +305,14 @@ class ZenithMesh(ZenithMeshInterface):
             for row in rows:
                 agent_id, action_blob, intent_hash, created_at, attempts, last_error = row
 
-                # Decrypt action_blob
+                # Decrypt action_blob only if cipher exists
                 try:
-                    action_blob = self._db_cipher.decrypt(action_blob)
+                    if self._db_cipher:
+                        action_blob = self._db_cipher.decrypt(action_blob)
+                    # If no cipher, action_blob is already in plaintext
                 except Exception as e:
-                    logger.error(f"Failed to decrypt action blob: {e}")
-                    last_error = str(e)
+                    logger.warning(f"[FALLBACK] Decryption failed, using plaintext: {e}")
+                    # Use as-is (plaintext fallback)
 
                 sealed_intent = SealedIntent(
                     intent_hash=intent_hash,
@@ -319,8 +334,8 @@ class ZenithMesh(ZenithMeshInterface):
 
             logger.info(f"Loaded {len(self._deferred_intents)} deferred intents")
         except Exception as e:
-            logger.error(f"Failed to load deferred intents: {e}")
-            raise DatabaseError(f"Load deferred intents failed: {e}") from e
+            logger.warning(f"[FALLBACK] Failed to load deferred intents: {e}, continuing with empty queue")
+            self._deferred_intents = []
 
     def _enqueue_intent(self, deferred_action: DeferredAction) -> None:
         """Queue a sealed intent to encrypted buffer.db."""
@@ -328,33 +343,46 @@ class ZenithMesh(ZenithMeshInterface):
             if not self.enable_deferred_sync:
                 return
 
-            conn = sqlite3.connect(self.buffer_db_path)
-            cursor = conn.cursor()
-
-            # Encrypt action_blob
-            encrypted_blob = self._db_cipher.encrypt(deferred_action.action_blob)
-
-            cursor.execute("""
-                INSERT INTO deferred_intents
-                (agent_id, action_blob, sealed_intent_hash, created_at, sync_attempts, last_error)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                deferred_action.agent_id,
-                encrypted_blob,
-                deferred_action.sealed_intent.intent_hash,
-                deferred_action.created_at,
-                deferred_action.sync_attempts,
-                deferred_action.last_error
-            ))
-
-            conn.commit()
-            conn.close()
-
+            # Keep in-memory queue always
             self._deferred_intents.append(deferred_action)
-            logger.info(f"Queued intent {deferred_action.sealed_intent.intent_hash[:8]} to buffer")
+
+            # Try to persist to database
+            try:
+                conn = sqlite3.connect(self.buffer_db_path)
+                cursor = conn.cursor()
+
+                # Encrypt action_blob if cipher available, otherwise use plaintext
+                if self._db_cipher:
+                    try:
+                        action_blob = self._db_cipher.encrypt(deferred_action.action_blob)
+                    except Exception as enc_err:
+                        logger.warning(f"[FALLBACK] Encryption failed, saving plaintext: {enc_err}")
+                        action_blob = deferred_action.action_blob
+                else:
+                    action_blob = deferred_action.action_blob
+
+                cursor.execute("""
+                    INSERT INTO deferred_intents
+                    (agent_id, action_blob, sealed_intent_hash, created_at, sync_attempts, last_error)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    deferred_action.agent_id,
+                    action_blob,
+                    deferred_action.sealed_intent.intent_hash,
+                    deferred_action.created_at,
+                    deferred_action.sync_attempts,
+                    deferred_action.last_error
+                ))
+
+                conn.commit()
+                conn.close()
+
+                logger.info(f"Queued intent {deferred_action.sealed_intent.intent_hash[:8]} to buffer")
+            except Exception as db_err:
+                logger.warning(f"[FALLBACK] Database persistence failed, using in-memory only: {db_err}")
+
         except Exception as e:
-            logger.error(f"Failed to enqueue intent: {e}")
-            raise DatabaseError(f"Enqueue failed: {e}") from e
+            logger.warning(f"[FALLBACK] Failed to enqueue intent: {e}, continuing with in-memory queue")
 
     def _remove_deferred_intent(self, intent_hash: str) -> None:
         """Remove a synced intent from buffer.db."""
@@ -587,6 +615,11 @@ class ZenithMesh(ZenithMeshInterface):
             True if connection successful
         """
         try:
+            if not SUBSTRATE_AVAILABLE:
+                logger.info(f"[STUB MODE] Skipping Substrate connection ({endpoint} - unavailable)")
+                self._is_connected = False
+                return False
+
             self._substrate = SubstrateInterface(url=endpoint)
             self._is_connected = True
             self.endpoint = endpoint

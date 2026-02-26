@@ -16,6 +16,9 @@ import logging
 import sys
 from typing import Dict, Any, Optional
 from pathlib import Path
+import os
+
+os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 import click
 
@@ -133,11 +136,11 @@ class AegisOrchestrator:
             }
 
             logger.info("\n" + "=" * 60)
-            logger.info("✓ Aegis Handshake COMPLETE")
+            logger.info("[+] Aegis Handshake COMPLETE")
             logger.info("=" * 60)
 
         except Exception as e:
-            logger.error(f"\n✗ Handshake failed: {e}")
+            logger.error(f"\n[-] Handshake failed: {e}")
             receipt["overall_status"] = "failed"
             receipt["error"] = str(e)
 
@@ -146,7 +149,7 @@ class AegisOrchestrator:
     async def _phase_zk_auth(self) -> Dict[str, Any]:
         """Phase 1: Zero-Knowledge Authentication"""
         try:
-            logger.info("  → Generating ZK circuit...")
+            logger.info("  -> Generating ZK circuit...")
             circuit = ZKCircuit(
                 circuit_id="identity-circuit-v1",
                 circuit_bytes=b"aegis_identity_circuit",
@@ -154,13 +157,13 @@ class AegisOrchestrator:
                 verification_key=b"verification_key_material"
             )
 
-            logger.info("  → Creating witness...")
+            logger.info("  -> Creating witness...")
             witness = {"age": 25, "valid": 1, "clearance": 5}
 
-            logger.info("  → Generating zero-knowledge proof...")
+            logger.info("  -> Generating zero-knowledge proof...")
             proof = await self.auth.generate_proof(circuit, witness)
 
-            logger.info("  → Verifying proof...")
+            logger.info("  -> Verifying proof...")
             verified = await self.auth.verify_proof(proof)
 
             result = {
@@ -171,31 +174,31 @@ class AegisOrchestrator:
                 "verified": verified
             }
 
-            logger.info(f"  ✓ ZK-Auth: {result['status']}")
+            logger.info(f"  [+] ZK-Auth: {result['status']}")
             return result
 
         except Exception as e:
-            logger.error(f"  ✗ ZK-Auth failed: {e}")
+            logger.error(f"  [-] ZK-Auth failed: {e}")
             return {"status": "error", "error": str(e)}
 
     async def _phase_pqc_exchange(self) -> Dict[str, Any]:
         """Phase 2: Post-Quantum Cryptography Exchange"""
         try:
-            logger.info("  → Generating Kyber-512 keypair...")
+            logger.info("  -> Generating Kyber-512 keypair...")
             keypair = await self.crypto.generate_keypair(PQCAlgorithm.KYBER_512)
 
-            logger.info("  → Performing key encapsulation...")
+            logger.info("  -> Performing key encapsulation...")
             # Use portion of public key as simulated ledger key
             ledger_pubkey = keypair.public_key[:1088]
             encapsulated = await self.crypto.key_encapsulate(ledger_pubkey)
 
-            logger.info("  → Deriving symmetric tunnel (AES-256-GCM)...")
+            logger.info("  -> Deriving symmetric tunnel (AES-256-GCM)...")
             tunnel = await self.crypto.derive_symmetric_tunnel(
                 encapsulated.shared_secret,
                 context=b"aegis-handshake-v1"
             )
 
-            logger.info("  → Verifying quantum integrity...")
+            logger.info("  -> Verifying quantum integrity...")
             integrity_ok = await self.crypto.verify_quantum_integrity()
 
             result = {
@@ -209,36 +212,36 @@ class AegisOrchestrator:
                 "quantum_integrity": integrity_ok
             }
 
-            logger.info(f"  ✓ PQC Exchange: {result['status']}")
+            logger.info(f"  [+] PQC Exchange: {result['status']}")
             return result
 
         except Exception as e:
-            logger.error(f"  ✗ PQC Exchange failed: {e}")
+            logger.error(f"  [-] PQC Exchange failed: {e}")
             return {"status": "error", "error": str(e)}
 
     async def _phase_ledger_intent(self, task_description: str) -> Dict[str, Any]:
         """Phase 3: Ledger Intent Sealing"""
         try:
-            logger.info("  → Connecting to Substrate node...")
+            logger.info("  -> Connecting to Substrate node...")
             try:
                 await self.ledger.connect(self.ledger.endpoint)
                 connected = True
             except Exception as e:
-                logger.warning(f"  ⚠ Connection failed (will queue): {e}")
+                logger.warning(f"  [!] Connection failed (will queue): {e}")
                 connected = False
 
-            logger.info("  → Sealing agent intent...")
+            logger.info("  -> Sealing agent intent...")
             action_blob = task_description.encode()
             sealed = await self.ledger.seal_intent("aegis-agent-01", action_blob)
 
-            logger.info("  → Querying blockchain state...")
+            logger.info("  -> Querying blockchain state...")
             if connected:
                 try:
                     chain_state = await self.ledger.get_chain_state()
                     block_number = chain_state.chain_height
                     block_hash = chain_state.latest_finalized_block
                 except Exception as e:
-                    logger.warning(f"  ⚠ Chain query failed: {e}")
+                    logger.warning(f"  [!] Chain query failed: {e}")
                     block_number = 0
                     block_hash = "0x0000"
             else:
@@ -256,27 +259,27 @@ class AegisOrchestrator:
                 "connected": connected
             }
 
-            logger.info(f"  ✓ Ledger Intent: {result['status']}")
+            logger.info(f"  [+] Ledger Intent: {result['status']}")
             return result
 
         except Exception as e:
-            logger.error(f"  ✗ Ledger Intent failed: {e}")
+            logger.error(f"  [X] Ledger Intent failed: {e}")
             return {"status": "error", "error": str(e)}
 
     async def _phase_wasm_execution(self) -> Dict[str, Any]:
         """Phase 4: Sandboxed WASM Execution"""
         try:
-            logger.info("  → Loading WASM module...")
+            logger.info("  -> Loading WASM module...")
             sample_wasm = b"\x00asm\x01\x00\x00\x00"  # WASM magic + version
             module = await self.kernel.load_module(sample_wasm)
 
-            logger.info("  → Creating sandbox...")
+            logger.info("  -> Creating sandbox...")
             sandbox_id = await self.kernel.create_sandbox(module)
 
-            logger.info("  → Executing agent task...")
+            logger.info("  -> Executing agent task...")
             result = await self.kernel.execute(sandbox_id, "process_task")
 
-            logger.info("  → Cleaning up sandbox...")
+            logger.info("  -> Cleaning up sandbox...")
             await self.kernel.cleanup_sandbox(sandbox_id)
 
             execution_result = {
@@ -290,11 +293,11 @@ class AegisOrchestrator:
                 "execution_time_ms": result.execution_time_ms
             }
 
-            logger.info(f"  ✓ WASM Execution: {execution_result['status']}")
+            logger.info(f"  [+] WASM Execution: {execution_result['status']}")
             return execution_result
 
         except Exception as e:
-            logger.error(f"  ✗ WASM Execution failed: {e}")
+            logger.error(f"  [X] WASM Execution failed: {e}")
             return {"status": "error", "error": str(e)}
 
     async def cleanup(self) -> None:
@@ -309,7 +312,7 @@ class AegisOrchestrator:
             except Exception as e:
                 logger.error(f"  {module.__class__.__name__} cleanup failed: {e}")
 
-        logger.info("✓ Cleanup complete")
+        logger.info("[+] Cleanup complete")
 
 
 # ============================================================================
@@ -340,7 +343,7 @@ def cli():
 )
 def handshake(task: str, endpoint: str, json_output: bool):
     """
-    Execute the Aegis Handshake: ZK-Auth → PQC → Ledger → WASM
+    Execute the Aegis Handshake: ZK-Auth -> PQC -> Ledger -> WASM
 
     Performs a complete 4-stage cryptographic workflow to:
     1. Verify agent identity via zero-knowledge proofs
@@ -369,10 +372,10 @@ def handshake(task: str, endpoint: str, json_output: bool):
     try:
         asyncio.run(run())
     except KeyboardInterrupt:
-        click.secho("\n✗ Interrupted by user", fg="red")
+        click.secho("\n[X] Interrupted by user", fg="red")
         sys.exit(1)
     except Exception as e:
-        click.secho(f"\n✗ Fatal error: {e}", fg="red")
+        click.secho(f"\n[X] Fatal error: {e}", fg="red")
         sys.exit(1)
 
 
@@ -381,11 +384,11 @@ def _print_receipt_formatted(receipt: Dict[str, Any]) -> None:
 
     # Header
     click.secho("\n", bold=True)
-    click.secho("╔" + "═" * 62 + "╗", fg="cyan")
-    click.secho("║" + " " * 62 + "║", fg="cyan")
-    click.secho("║  " + "QUANTUM-SAFE EXECUTION RECEIPT (Aegis-Prime)".center(58) + "  ║", fg="cyan", bold=True)
-    click.secho("║" + " " * 62 + "║", fg="cyan")
-    click.secho("╚" + "═" * 62 + "╝", fg="cyan")
+    click.secho("+" + "=" * 62 + "+", fg="cyan")
+    click.secho("|" + " " * 62 + "|", fg="cyan")
+    click.secho("|  " + "QUANTUM-SAFE EXECUTION RECEIPT (Aegis-Prime)".center(58) + "  |", fg="cyan", bold=True)
+    click.secho("|" + " " * 62 + "|", fg="cyan")
+    click.secho("+" + "=" * 62 + "+", fg="cyan")
 
     # Overall status
     status = receipt.get("overall_status", "unknown")
@@ -402,9 +405,9 @@ def _print_receipt_formatted(receipt: Dict[str, Any]) -> None:
         click.echo(f"Task: {task}")
 
     # Phase summaries
-    click.secho("\n" + "─" * 64, fg="cyan")
+    click.secho("\n" + "-" * 64, fg="cyan")
     click.secho("PHASE DETAILS", fg="cyan", bold=True)
-    click.secho("─" * 64 + "\n", fg="cyan")
+    click.secho("-" * 64 + "\n", fg="cyan")
 
     phases = receipt.get("phases", {})
     for phase_num, (phase_name, phase_data) in enumerate(phases.items(), 1):
@@ -428,7 +431,7 @@ def _print_receipt_formatted(receipt: Dict[str, Any]) -> None:
                 continue
 
             if isinstance(value, bool):
-                symbol = "✓" if value else "✗"
+                symbol = "[+]" if value else "[X]"
                 click.secho(f"   {symbol} {key}: {value}")
             elif isinstance(value, (int, float)):
                 click.echo(f"   • {key}: {value}")
@@ -442,24 +445,24 @@ def _print_receipt_formatted(receipt: Dict[str, Any]) -> None:
     # Security summary
     security = receipt.get("security_summary", {})
     if security:
-        click.secho("─" * 64, fg="cyan")
+        click.secho("-" * 64, fg="cyan")
         click.secho("SECURITY SUMMARY", fg="cyan", bold=True)
-        click.secho("─" * 64 + "\n", fg="cyan")
+        click.secho("-" * 64 + "\n", fg="cyan")
 
         for key, value in security.items():
-            symbol = "✓" if value else "✗"
+            symbol = "[+]" if value else "[X]"
             key_label = key.replace("_", " ").title()
             click.secho(f"{symbol} {key_label}: ", nl=False)
             click.secho("PASS" if value else "FAIL", fg="green" if value else "red")
 
     # Error details
     if "error" in receipt:
-        click.secho("\n─" * 64, fg="red")
+        click.secho("\n-" * 64, fg="red")
         click.secho("ERROR DETAILS", fg="red", bold=True)
-        click.secho("─" * 64 + "\n", fg="red")
+        click.secho("-" * 64 + "\n", fg="red")
         click.secho(f"Error: {receipt['error']}", fg="red")
 
-    click.secho("\n" + "═" * 64 + "\n", fg="cyan")
+    click.secho("\n" + "=" * 64 + "\n", fg="cyan")
 
 
 @cli.command()
@@ -472,40 +475,40 @@ def health(endpoint: str):
 
         try:
             crypto = CypherShield()
-            click.secho("✓ CypherShield: OK", fg="green")
+            click.secho("[+] CypherShield: OK", fg="green")
 
             try:
                 ok = await crypto.verify_quantum_integrity()
                 if ok:
-                    click.secho("  ✓ Quantum integrity verified", fg="green")
+                    click.secho("  [+] Quantum integrity verified", fg="green")
             except Exception as e:
-                click.secho(f"  ⚠ Quantum check failed: {e}", fg="yellow")
+                click.secho(f"  [!] Quantum check failed: {e}", fg="yellow")
 
         except Exception as e:
-            click.secho(f"✗ CypherShield: FAILED - {e}", fg="red")
+            click.secho(f"[X] CypherShield: FAILED - {e}", fg="red")
 
         try:
             ledger = ZenithMesh(endpoint=endpoint)
-            click.secho("✓ ZenithMesh: OK", fg="green")
+            click.secho("[+] ZenithMesh: OK", fg="green")
         except Exception as e:
-            click.secho(f"✗ ZenithMesh: FAILED - {e}", fg="red")
+            click.secho(f"[X] ZenithMesh: FAILED - {e}", fg="red")
 
         try:
             auth = LuminaAuth()
-            click.secho("✓ LuminaAuth: OK", fg="green")
+            click.secho("[+] LuminaAuth: OK", fg="green")
         except Exception as e:
-            click.secho(f"✗ LuminaAuth: FAILED - {e}", fg="red")
+            click.secho(f"[X] LuminaAuth: FAILED - {e}", fg="red")
 
         try:
             kernel = SynapseKernel()
-            click.secho("✓ SynapseKernel: OK", fg="green")
+            click.secho("[+] SynapseKernel: OK", fg="green")
         except Exception as e:
-            click.secho(f"✗ SynapseKernel: FAILED - {e}", fg="red")
+            click.secho(f"[X] SynapseKernel: FAILED - {e}", fg="red")
 
     try:
         asyncio.run(run())
     except Exception as e:
-        click.secho(f"✗ Health check failed: {e}", fg="red")
+        click.secho(f"[X] Health check failed: {e}", fg="red")
         sys.exit(1)
 
 

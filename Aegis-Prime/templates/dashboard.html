@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aegis-Prime Web Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: fadeIn 0.8s ease-in;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #00d4ff, #7f39fb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            color: #b0b0b0;
+        }
+
+        .control-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 40px;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-panel h2 {
+            margin-bottom: 20px;
+            color: #00d4ff;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #b0b0b0;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #00d4ff;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            background: linear-gradient(45deg, #00d4ff, #7f39fb);
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid #00d4ff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .receipt-container {
+            display: none;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .receipt-header {
+            background: rgba(0, 212, 255, 0.1);
+            border-left: 4px solid #00d4ff;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 5px;
+        }
+
+        .receipt-header h2 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        .receipt-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .info-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 3px solid #7f39fb;
+        }
+
+        .info-label {
+            font-size: 0.9em;
+            color: #b0b0b0;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 1.1em;
+            color: #fff;
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .phases-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .phase-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .phase-card:hover {
+            border-color: #00d4ff;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+            transform: translateY(-5px);
+        }
+
+        .phase-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #00d4ff, #7f39fb);
+        }
+
+        .phase-number {
+            font-size: 2em;
+            font-weight: 700;
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        .phase-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        .phase-status {
+            padding: 10px 15px;
+            border-radius: 5px;
+            display: inline-block;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-size: 0.95em;
+        }
+
+        .status-verified,
+        .status-complete,
+        .status-success,
+        .status-submitted {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .status-queued {
+            background: rgba(255, 193, 0, 0.2);
+            color: #ffc100;
+            border: 1px solid rgba(255, 193, 0, 0.3);
+        }
+
+        .status-error,
+        .status-failed {
+            background: rgba(255, 0, 87, 0.2);
+            color: #ff0057;
+            border: 1px solid rgba(255, 0, 87, 0.3);
+        }
+
+        .phase-details {
+            font-size: 0.95em;
+            color: #b0b0b0;
+        }
+
+        .phase-detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .phase-detail-item:last-child {
+            border-bottom: none;
+        }
+
+        .phase-label {
+            color: #7f39fb;
+            font-weight: 500;
+        }
+
+        .phase-value {
+            color: #fff;
+            text-align: right;
+            word-break: break-word;
+        }
+
+        .security-summary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            margin-bottom: 40px;
+        }
+
+        .security-summary h3 {
+            color: #00d4ff;
+            margin-bottom: 25px;
+            font-size: 1.5em;
+        }
+
+        .security-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .security-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+            border-left: 3px solid #7f39fb;
+        }
+
+        .security-icon {
+            font-size: 1.5em;
+            min-width: 30px;
+        }
+
+        .security-icon.pass {
+            color: #00ff88;
+        }
+
+        .security-icon.fail {
+            color: #ff0057;
+        }
+
+        .security-text {
+            flex: 1;
+        }
+
+        .security-label {
+            font-size: 0.9em;
+            color: #b0b0b0;
+        }
+
+        .security-value {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .error-box {
+            background: rgba(255, 0, 87, 0.1);
+            border: 1px solid rgba(255, 0, 87, 0.3);
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+            color: #ff6b9d;
+        }
+
+        .health-status {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .health-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+            border-left: 3px solid #7f39fb;
+        }
+
+        .health-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .health-indicator.ok {
+            background: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        .health-indicator.failed {
+            background: #ff0057;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .phases-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .control-panel {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>⚔️ Aegis-Prime</h1>
+            <p>Sovereign Intelligence Mesh - Quantum-Safe Execution Orchestrator</p>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <h2>Execute Handshake</h2>
+            <form id="handshakeForm">
+                <div class="form-group">
+                    <label for="task">Task Description</label>
+                    <textarea id="task" name="task" placeholder="Enter what you want the agent to do..." required>Execute critical agent mission: Verify identity and transfer assets</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="endpoint">Substrate Endpoint</label>
+                    <input type="text" id="endpoint" name="endpoint" placeholder="ws://localhost:9944" value="ws://localhost:9944">
+                </div>
+
+                <div class="button-group">
+                    <button type="submit">🚀 Execute Handshake</button>
+                    <button type="button" onclick="checkHealth()">🏥 Health Check</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 15px;">Processing Aegis Handshake...</p>
+        </div>
+
+        <!-- Receipt Container -->
+        <div class="receipt-container" id="receiptContainer">
+            <!-- Receipt Header -->
+            <div class="receipt-header">
+                <h2>⬆ Quantum-Safe Execution Receipt</h2>
+                <div class="receipt-info" id="receiptInfo">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <!-- Phase Cards -->
+            <div class="phases-grid" id="phasesGrid">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Security Summary -->
+            <div class="security-summary">
+                <h3>🔐 Security Summary</h3>
+                <div class="security-items" id="securityItems">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <!-- Error Box -->
+            <div class="error-box" id="errorBox" style="display: none;">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('handshakeForm');
+        const loading = document.getElementById('loading');
+        const receiptContainer = document.getElementById('receiptContainer');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const task = document.getElementById('task').value;
+            const endpoint = document.getElementById('endpoint').value;
+
+            loading.style.display = 'block';
+            receiptContainer.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/handshake', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task, endpoint })
+                });
+
+                const receipt = await response.json();
+                displayReceipt(receipt);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error executing handshake: ' + error.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+
+        function displayReceipt(receipt) {
+            // Receipt Info
+            const receiptInfo = document.getElementById('receiptInfo');
+            receiptInfo.innerHTML = `
+                <div class="info-item">
+                    <div class="info-label">Receipt ID</div>
+                    <div class="info-value">${receipt.receipt_id}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Status</div>
+                    <div class="info-value" style="color: ${receipt.overall_status === 'success' ? '#00ff88' : '#ff6b9d'}">${receipt.overall_status.toUpperCase()}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Timestamp</div>
+                    <div class="info-value">${new Date(receipt.timestamp * 1000).toLocaleString()}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Task</div>
+                    <div class="info-value">${receipt.task_description}</div>
+                </div>
+            `;
+
+            // Phase Cards
+            const phasesGrid = document.getElementById('phasesGrid');
+            phasesGrid.innerHTML = '';
+
+            const phases = [
+                { key: 'phase_1_zk_auth', title: 'ZK-Auth', number: '1️⃣' },
+                { key: 'phase_2_pqc_exchange', title: 'PQC Exchange', number: '2️⃣' },
+                { key: 'phase_3_ledger_intent', title: 'Ledger Intent', number: '3️⃣' },
+                { key: 'phase_4_wasm_execution', title: 'WASM Execution', number: '4️⃣' }
+            ];
+
+            phases.forEach(phase => {
+                const data = receipt.phases[phase.key];
+                if (!data) return;
+
+                const statusClass = `status-${data.status.toLowerCase()}`;
+                let details = '';
+
+                for (const [key, value] of Object.entries(data)) {
+                    if (key !== 'status' && key !== 'error') {
+                        let displayValue = value;
+                        if (typeof value === 'string' && value.length > 50) {
+                            displayValue = value.substring(0, 47) + '...';
+                        } else if (typeof value === 'boolean') {
+                            displayValue = value ? '✓ Yes' : '✗ No';
+                        }
+                        details += `
+                            <div class="phase-detail-item">
+                                <span class="phase-label">${key.replace(/_/g, ' ').toUpperCase()}</span>
+                                <span class="phase-value">${displayValue}</span>
+                            </div>
+                        `;
+                    }
+                }
+
+                const card = `
+                    <div class="phase-card">
+                        <div class="phase-number">${phase.number}</div>
+                        <div class="phase-title">${phase.title}</div>
+                        <div class="phase-status ${statusClass}">${data.status.toUpperCase()}</div>
+                        <div class="phase-details">${details}</div>
+                    </div>
+                `;
+
+                phasesGrid.innerHTML += card;
+            });
+
+            // Security Summary
+            const securityItems = document.getElementById('securityItems');
+            securityItems.innerHTML = '';
+
+            if (receipt.security_summary) {
+                for (const [key, value] of Object.entries(receipt.security_summary)) {
+                    const icon = value ? '✓' : '✗';
+                    const iconClass = value ? 'pass' : 'fail';
+                    securityItems.innerHTML += `
+                        <div class="security-item">
+                            <div class="security-icon ${iconClass}">${icon}</div>
+                            <div class="security-text">
+                                <div class="security-label">${key.replace(/_/g, ' ').toUpperCase()}</div>
+                                <div class="security-value">${value ? 'PASS' : 'FAIL'}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            // Error Box
+            const errorBox = document.getElementById('errorBox');
+            if (receipt.error) {
+                errorBox.innerHTML = `<strong>Error:</strong> ${receipt.error}`;
+                errorBox.style.display = 'block';
+            } else {
+                errorBox.style.display = 'none';
+            }
+
+            receiptContainer.style.display = 'block';
+        }
+
+        async function checkHealth() {
+            try {
+                const response = await fetch('/api/health');
+                const health = await response.json();
+
+                let healthHtml = '<div class="health-status">';
+                for (const [module, status] of Object.entries(health)) {
+                    const isOk = status === 'OK';
+                    healthHtml += `
+                        <div class="health-item">
+                            <div class="health-indicator ${isOk ? 'ok' : 'failed'}"></div>
+                            <div>
+                                <div style="font-weight: 600;">${module.replace(/_/g, ' ').toUpperCase()}</div>
+                                <div style="font-size: 0.9em; color: ${isOk ? '#00ff88' : '#ff6b9d'}">${status}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                healthHtml += '</div>';
+
+                alert('Health Check Results:\n' + JSON.stringify(health, null, 2));
+            } catch (error) {
+                alert('Error checking health: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
