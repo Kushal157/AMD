@@ -682,6 +682,19 @@
                 </div>
                 <div class="result-hash" id="resultHash">SHA256<br>0x7d2f9a1e8c5b3d4f6a7b8c9d0e1f2a3b4c5d6e7f</div>
             </div>
+
+            <!-- AI Assistant Section -->
+            <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid rgba(100, 150, 255, 0.2);">
+                <div class="result-label">Ask Claude Opus</div>
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <input type="text" id="opusQuestion" placeholder="Ask a question about your execution..."
+                           style="flex: 1; padding: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(100, 150, 255, 0.2); border-radius: 8px; color: #fff; font-size: 0.9em;"
+                           onkeypress="if(event.key==='Enter') askOpus()">
+                    <button id="askBtn" onclick="askOpus()" style="padding: 12px 25px; background: linear-gradient(45deg, #00d4ff, #7f39fb); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">Ask</button>
+                </div>
+
+                <div id="opusResponse" style="display: none; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(100, 150, 255, 0.15); border-radius: 12px; padding: 20px; color: #9ca3af; line-height: 1.7;"></div>
+            </div>
         </div>
     </div>
 
@@ -816,6 +829,75 @@
             document.getElementById('resultSection').classList.add('show');
             addConsoleLog('Handshake Authorized', true);
             addConsoleLog('Agent Logic Commit');
+
+            // Store current receipt for AI context
+            window.currentReceipt = receipt;
+        }
+
+        // Ask Claude Opus
+        function askOpus() {
+            const question = document.getElementById('opusQuestion').value.trim();
+            const responseDiv = document.getElementById('opusResponse');
+            const askBtn = document.getElementById('askBtn');
+
+            if (!question) {
+                alert('Please enter a question');
+                return;
+            }
+
+            // Disable button and show loading
+            askBtn.disabled = true;
+            askBtn.textContent = 'Asking...';
+            responseDiv.style.display = 'block';
+            responseDiv.innerHTML = '<div style="color: #6096cf;">Consulting Claude Opus...</div>';
+
+            // Send question to backend
+            fetch('/api/ask-opus', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question: question,
+                    context: window.currentReceipt || {}
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error && !data.answer) {
+                    responseDiv.innerHTML = `<div style="color: #ff6b6b;">Error: ${data.error}</div>`;
+                } else {
+                    // Format the response
+                    let html = `<div style="color: #fff; font-weight: 600; margin-bottom: 10px;">Claude Opus Response:</div>`;
+                    html += `<div style="color: #9ca3af; margin-bottom: 15px;">${escapeHtml(data.answer).replace(/\n/g, '<br>')}</div>`;
+
+                    if (data.model) {
+                        html += `<div style="font-size: 0.8em; color: #6b7280; margin-top: 15px;">`;
+                        html += `Model: ${data.model}`;
+                        if (data.tokens_used) {
+                            html += ` | Tokens: ${data.tokens_used.input} (input) + ${data.tokens_used.output} (output)`;
+                        }
+                        html += `</div>`;
+                    }
+
+                    responseDiv.innerHTML = html;
+                }
+
+                // Re-enable button
+                askBtn.disabled = false;
+                askBtn.textContent = 'Ask';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                responseDiv.innerHTML = `<div style="color: #ff6b6b;">Error: ${error.message}</div>`;
+                askBtn.disabled = false;
+                askBtn.textContent = 'Ask';
+            });
+        }
+
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
     </script>
 </body>

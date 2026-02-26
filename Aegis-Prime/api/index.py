@@ -257,7 +257,87 @@ def health_check():
     return jsonify(health)
 
 
-# Error handlers
+# AI Assistant - Claude Opus Integration
+@app.route('/api/ask-opus', methods=['POST'])
+def ask_opus():
+    """Ask Claude Opus a question based on the execution results"""
+    try:
+        data = request.get_json() or {}
+        question = data.get('question', '').strip()
+        context = data.get('context', {})
+
+        if not question:
+            return jsonify({'error': 'Question is required', 'answer': ''}), 400
+
+        # Get API key from environment
+        api_key = os.getenv('ANTHROPIC_API_KEY')
+        if not api_key:
+            return jsonify({
+                'answer': 'Claude Opus API key not configured. Please set ANTHROPIC_API_KEY environment variable.',
+                'model': 'unavailable'
+            }), 200
+
+        try:
+            import anthropic
+
+            client = anthropic.Anthropic(api_key=api_key)
+
+            # Prepare context from execution results
+            context_info = ""
+            if context:
+                context_info = f"\n\nExecution Context:\n"
+                context_info += f"- Task: {context.get('task_description', 'N/A')}\n"
+                context_info += f"- Status: {context.get('overall_status', 'N/A')}\n"
+                context_info += f"- Receipt ID: {context.get('receipt_id', 'N/A')}\n"
+                if context.get('phases'):
+                    context_info += "- Phases:\n"
+                    for phase_name, phase_data in context['phases'].items():
+                        if isinstance(phase_data, dict):
+                            context_info += f"  - {phase_name}: {phase_data.get('status', 'unknown')}\n"
+
+            # Create message with context
+            full_prompt = f"{question}{context_info}"
+
+            message = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=1024,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": full_prompt
+                    }
+                ],
+                system="You are an AI assistant helping users understand their Aegis-Prime execution results. Provide clear, concise answers about cryptography, blockchain, quantum safety, and the execution workflow. If asked about specific execution details, use the context provided."
+            )
+
+            # Extract the response
+            answer = message.content[0].text if message.content else "No response generated"
+
+            return jsonify({
+                'question': question,
+                'answer': answer,
+                'model': 'claude-3-5-sonnet-20241022',
+                'tokens_used': {
+                    'input': message.usage.input_tokens,
+                    'output': message.usage.output_tokens
+                }
+            })
+
+        except ImportError:
+            return jsonify({
+                'answer': 'Anthropic library not available. Please install: pip install anthropic',
+                'model': 'unavailable'
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Error in ask_opus: {e}")
+        return jsonify({
+            'error': str(e),
+            'answer': f'Error communicating with Claude Opus: {str(e)}'
+        }), 500
+
+
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Not found', 'status': 404}), 404

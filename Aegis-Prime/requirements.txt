@@ -21,6 +21,9 @@ cbor2>=5.4.6
 # Logging & Observability
 structlog>=24.1.0
 
+# AI Assistant - Claude Opus Integration
+anthropic>=0.25.0
+
 # Optional Dependencies (will gracefully degrade if unavailable)
 # Uncomment locally if needed, but Vercel will skip these
 # liboqs-python==0.8.0
